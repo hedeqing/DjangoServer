@@ -3,11 +3,11 @@ from django.contrib import auth
 from django.db import connection
 from django.db.models import Q
 from django.http import JsonResponse, HttpResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.contrib.auth.hashers import make_password, check_password
 # Create your views here.
 from django.utils.safestring import mark_safe
-
+from schoolteam import forms, models
 from schoolteam.models import RecommendContest, Team, Users, Message
 
 # Create your views here.
@@ -21,9 +21,10 @@ from schoolteam.consumers import ChatConsumer
 
 def login(request):
     pass
-    return render(request,"schoolteam/login.html")
+    return render(request, "schoolteam/web_login.html")
+
 def index(request):
-    return render(request, 'schoolteam/index.html', {})
+    return render(request, 'schoolteam/index.html')
 
 
 def room(request, room_name):
@@ -38,8 +39,7 @@ def room(request, room_name):
 def judge_login(request):
     data = {}
     users = serializers.serialize("json",Users.objects.all())
-    data['Users'] = Users
-    return HttpResponse(json.dumps(data))
+    return HttpResponse(users)
 
 def get_data(request):
     number = request.POST.get("号码")
@@ -113,14 +113,17 @@ def sign_up(request):
         if name is not None and password is not None and number is not None and gender is not None:
             users = Users.objects.create(username=name,number = number,password =password,gender = gender)
             users.save()
+            print(users.save())
+            if users.save():
+                status['stata'] = {'status': '1'}
+                return HttpResponse(json.dumps(status))
             # Userslogin = auth.authenticate(Usersname=name,password=password,number = number,gender = gender)
             # auth.login(request, Userslogin)
-            status['stata'] ={'status':'1'}
-            return  HttpResponse(json.dumps(status))
+            else:
+                status['stata'] = {'status': '0'}
+                return HttpResponse(json.dumps(status))
             # return HttpResponseRedirect('/blog')
-        else:
-            status['stata'] = {'status':'0'}
-            return HttpResponse(json.dumps(status))
+
 
 def show_recommend(request):
         education  =request.POST.get('education')
@@ -134,11 +137,27 @@ def show_recommend(request):
 
 def  get_team(request):
     team = serializers.serialize("json",Team.objects.all())
+    print(team)
     return  HttpResponse(team)
 
-
-
-
+def updata_avator(request):
+    number  = request.POST.get("number")
+    avator = request.POST.get("avator")
+    print(avator)
+    print(number)
+    data = {}
+    try:
+        user = Users.objects.get(number = number)
+        print(user)
+        user.picture = avator
+        print(user.picture)
+        user.save()
+        print(user)
+        data['stata'] = {"status": "2"}
+        print("修改头像成功")
+        return HttpResponse(json.dumps(data))
+    except :
+        print("找不到该用户")
 
 def get_team_by_category(request):
     if request.method == "POST":
@@ -149,7 +168,7 @@ def get_team_by_category(request):
         data = team
         print(data)
         return HttpResponse(data)
-#待修改
+
 def release_team(request):
     team_id = request.POST.get("team_id")
     users = Users.objects.get(number = team_id)
@@ -159,11 +178,13 @@ def release_team(request):
     location = request.POST.get("location")
     fare = request.POST.get("fareDescription")
     category = request.POST.get("category")
+    imagePath = request.POST.get("image_path")
+    print(imagePath)
     menber_id = users.id
     print(users.id)
     data_ok = {}
     data_not_ok = {}
-    team = Team(team_id = users,description = description, start_time= start_time, end_time=end_time, location = location,fare=fare,category=category,menber_id = menber_id)
+    team = Team(team_id = users,description = description, start_time= start_time, end_time=end_time, location = location,fare=fare,category=category,menber_id = menber_id,team_picture=imagePath)
     team.save()
     print(team)
     data_ok['stata'] =  {'status':'1'}
@@ -208,7 +229,9 @@ def update(request):
         return HttpResponse(json.dumps(data_not_ok))
 
 def get_message(request):
-    message = Message.objects.all()
+    room = request.POST.get("room")
+    message = Message.objects.filter(room=room)
+    print(serializers.serialize("json",message))
     return HttpResponse(serializers.serialize("json",message))
 
 def get_myteam(request):
@@ -263,4 +286,107 @@ def join_team(request):
         team.menber_id = team.menber_id+","+str(my_id)
         team.save()
         return  HttpResponse(json.dumps(data_ok))
+def search(request):
+    text = request.POST.get("text")
+    # text = '找对象'
+    print(text)
+    team = Team.objects.filter(description__contains=text)
+    team = serializers.serialize("json",team)
+    print(team)
+    return HttpResponse(team)
+#web server
+def web_admin(request):
+    pass
+    return  render(request,"schoolteam/web_admin.html")
+def web_index(request):
+    pass
+    return  render(request,"schoolteam/web_index.html")
 
+def web_login(request):
+    if request.session.get("is_login",None):#不允许重复登陆
+        return  redirect("/index/")
+    if request.method == 'POST':
+        login_form = forms.UserForm(request.POST)
+        message = '请检查填写的内容！'
+        print(login_form)
+        print(login_form.is_valid())
+
+        if login_form.is_valid():
+            number = login_form.cleaned_data.get('number')
+            password = login_form.cleaned_data.get('password')
+
+            try:
+                user = models.Users.objects.get(number=number)
+            except :
+                message = '用户不存在！'
+                # return render(request, 'schoolteam/web_admin.html', locals())
+
+            if user.password == password:
+                request.session['is_login'] = True
+                request.session['user_id'] =user.id
+                request.session['user_username'] = user.username
+                return redirect('/web_admin/')
+            else:
+                message = '密码不正确！'
+                # return render(request, 'schoolteam/web_admin.html', locals())
+        else:
+            return render(request, 'schoolteam/web_login.html',{"login_form":login_form}, locals())
+
+    login_form = forms.UserForm()
+    return render(request, 'schoolteam/web_login.html',{"login_form":login_form}, locals())
+
+def web_register(request):
+    if request.session.get('is_login',None):
+        return  redirect("/web_index/")
+    if request.method=="POST":
+        register_form = forms.MyRegisterForm(request.POST)
+        print(register_form)
+        print(register_form.is_valid())
+        # message = "请检查填写的内容"
+        if register_form.is_valid():
+            name = register_form.cleaned_data.get("username")
+            number = register_form.cleaned_data.get("number")
+            password1 = register_form.cleaned_data.get("password1")
+            password2 = register_form.cleaned_data.get('password2')
+            # email = register_form.cleaned_data.get('email')
+            dynamic = register_form.cleaned_data.get('dynamic')
+            gender = register_form.cleaned_data.get('sex')
+
+            if password1 != password2:
+                message = "两次输入的密码不同"
+                return  render(request, 'schoolteam/web_register.html', locals())
+            else:
+                same_name_user = models.Users.objects.filter(number=number)
+                if same_name_user:
+                    message  = "用户已经存在"
+                    return  render(request, 'schoolteam/web_register.html', locals())
+                # same_email_user  = models.Users.objects.filter(email = email)
+                # if same_email_user:
+                #     message = "该邮箱已经被注册"
+                #     return  render(request, 'schoolteam/web_register.html', locals())
+
+                new_user = models.Users()
+                new_user.username = name
+                new_user.number = number
+                new_user.password = password1
+                new_user.dynamic =dynamic
+                new_user.gender = gender
+                new_user.save()
+                print(new_user)
+                message = "注册成功"
+                return render(request,"schoolteam/web_login.html",locals())
+        else:
+            return  render(request, 'schoolteam/web_register.html')
+    register_form = forms.MyRegisterForm()
+    return render(request, 'schoolteam/web_register.html',{"register_form":register_form})
+
+
+def logout_web(request):
+    if not request.session.get('is_login',None):
+        return redirect('/web_index/')
+    request.session.flush()
+    return redirect("/web_login/")
+
+def test(request):
+    user = Users.objects.all()
+    return  render(request,"schoolteam/test.html",{"user":user})

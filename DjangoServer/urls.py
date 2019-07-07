@@ -15,7 +15,6 @@ Including another URLconf
 """
 from django.conf.urls import url
 from django.contrib import admin
-from django.template.context_processors import static
 from django.urls import path, re_path, include
 from django.views.static import serve
 
@@ -23,13 +22,23 @@ import schoolteam
 from DjangoServer import settings
 from schoolteam import views
 
-urlpatterns = [
-    # path('admin/', admin.site.urls),
-    url(r'^chat/', include('schoolteam.urls')),
-    url(r'^admin/', admin.site.urls),
-    # path('index/', views.index),
+import  xadmin
 
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('xadmin/', xadmin.site.urls),
+    url(r'^chat/', include('schoolteam.urls')),
+    # url(r'^admin/', admin.site.urls),
+    #web
+    url('web_index/', views.web_index),
+    url('test/', views.test),
+    url('web_admin/', views.web_admin),
+    url('web_login/', views.web_login),
+    path('web_register/', views.web_register),
+    url('logout/', views.logout_web),
+    # json
     path('judge_login/', views.judge_login),
+    path('search/', views.search),
     path('login/', views.login),
     path('release_team/', views.release_team),
     path('get_data/', views.get_data),
@@ -42,6 +51,7 @@ urlpatterns = [
     path('get_myteam/', views.get_myteam),
     path('join_team/', views.join_team),
     path('get_name_by_id/', views.get_name_by_id),
+    path('update_avator/', views.updata_avator),
 
     # re_path(r'^media/(?P<path>.*)', serve, {"document_root": MEDIA_ROOT}),
     url('media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),

@@ -41,7 +41,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'message': message,
                 'fromName': fromName,
                 'room': room,
-
             }
         )
     # Receive message from room group
@@ -49,7 +48,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         message = event['message']
         fromName = event['fromName']
         room = event['room']
+
         # messages = Message.objects.create(content= message,fromName=fromName,room = room)
+        # message.save()
         # Send message to WebSocket
         await self.send(text_data=json.dumps({
             'message': message,
